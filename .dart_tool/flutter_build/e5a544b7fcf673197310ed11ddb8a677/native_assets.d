@@ -1,0 +1,1 @@
+ /Users/chenhongkai/Downloads/BaodaoFlutter/.dart_tool/flutter_build/e5a544b7fcf673197310ed11ddb8a677/native_assets.yaml: 
