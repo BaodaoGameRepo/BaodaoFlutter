@@ -26,6 +26,12 @@ class CardSoldier with BaseCard {
   get hasPlay => true;
 
   @override
+  get count => 1;
+
+  @override
+  get playCount => 1;
+
+  @override
   void funPlay() {
 
   }

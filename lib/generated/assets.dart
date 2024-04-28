@@ -30,6 +30,8 @@ class Assets {
   static const String pngIconUpload = 'images/png/icon_upload.png';
   static const String pngLabelLeft = 'images/png/label_left.png';
   static const String pngSoldier = 'images/png/soldier.jpg';
+  static const String pngSpearmen = 'images/png/spearmen.jpg';
+  static const String pngSwordsman = 'images/png/swordsman.jpg';
   static const String pngWelcomeBg = 'images/png/welcome_bg.png';
   static const String pngWelcomeDefaultAvatar = 'images/png/welcome_default_avatar.png';
   static const String pngWelcomeTabView1 = 'images/png/welcome_tabView1.png';

@@ -2,15 +2,17 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:gobang/ai/Ai.dart';
 import 'package:gobang/bridge/ChessShape.dart';
 import 'package:gobang/card/card_soldier.dart';
+import 'package:gobang/card/card_spearmen.dart';
+import 'package:gobang/card/card_swordsman.dart';
 import 'package:gobang/common_widget/constants/mj_colors.dart';
+import 'package:gobang/common_widget/screen_sp.dart';
 import 'package:gobang/factory/ThemeFactory.dart';
 import 'package:gobang/factory/BlueTheme.dart';
 import 'package:gobang/flyweight/Chess.dart';
 import 'package:gobang/flyweight/ChessFlyweightFactory.dart';
-import 'package:gobang/memorandum/Checkerboard.dart';
+import 'package:gobang/memorandum/Checkerboard.dart' as ck;
 import 'package:gobang/state/UserContext.dart';
 import 'package:gobang/utils/TipsDialog.dart';
 import 'package:gobang/viewModel/GameViewModel.dart';
@@ -19,6 +21,7 @@ import 'package:sprintf/sprintf.dart';
 import 'bridge/CircleShape.dart';
 import 'card/base_card.dart';
 import 'common_widget/hand_bottom_sheet.dart';
+import 'common_widget/mj_text_shadow_container.dart';
 import 'factory/BlackThemeFactory.dart';
 import 'factory/BlueThemeFactory.dart';
 import 'flyweight/Position.dart';
@@ -34,16 +37,17 @@ class GamePage extends StatefulWidget {
 class GamePageState extends State<GamePage> {
   ThemeFactory? _themeFactory;
   GameViewModel _viewModel = GameViewModel.getInstance();
-  Checkerboard _originator = Checkerboard.getInstance();
+  ck.Checkerboard _originator = ck.Checkerboard();
   Map<int, bool> check = {};
-  bool needChoose = false;
+  List<int> checkList = [];
   Icon lightOn = Icon(Icons.lightbulb, color: Colors.amberAccent);
   Icon lightOff = Icon(Icons.lightbulb_outline_rounded);
   Icon circle = Icon(Icons.circle_outlined);
   Icon rect = Icon(Icons.crop_square);
   Icon? currentLight, currentShape;
 
-  String stateMessage = "";
+  bool hasPlay = true;
+
 
   List<BaseCard> hands = [];
 
@@ -54,9 +58,9 @@ class GamePageState extends State<GamePage> {
     currentShape = circle;
     hands.add(CardSoldier());
     hands.add(CardSoldier());
+    hands.add(CardSwordsman());
     hands.add(CardSoldier());
-    hands.add(CardSoldier());
-    stateMessage = "你的回合！";
+    hands.add(CardSpearmen());
     super.initState();
   }
 
@@ -116,38 +120,61 @@ class GamePageState extends State<GamePage> {
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisSize: MainAxisSize.max,
               children: <Widget>[
+                if (_originator.step != ck.Step.empty)
+                  MJTextShadowContainer(
+                    width: 189.csp,
+                    height: 48.csp,
+                    text: "确认 >",
+                    onTap: () {
+                      hasPlay = true;
+                      if (_originator.step == ck.Step.deploy) {
+                        int minX = 200, minY = 200, maxX = -1, maxY = -1;
+                        List<ck.Point> points = checkList.map((e) {
+                          int x = e ~/ 16;
+                          int y = e % 16;
+                          if (x < minX) minX = x;
+                          if (x > maxX) maxX = x;
+                          if (y < minY) minY = y;
+                          if (y > maxY) maxY = y;
+                          return ck.Point(x, y, ck.SQState.red);
+                        }).toList();
+                        if (_originator.currentPlay?.checkPlayTheSame(points, minY, maxY, minX, maxX) == true) {
+                          setState(() {
+                            _originator.updata(points);
+                          });
+                        } else {
+                          setState(() {
+                            _originator.stateMessage = "形状不正确";
+                          });
+                        }
+                      }
+
+                    },
+                  ),
                 Padding(
                   padding: EdgeInsets.only(top: 14, bottom: 30),
                   child: Text(
-                    stateMessage,
+                    _originator.stateMessage,
                     style: TextStyle(color: Colors.white),
                   ),
                 ),
+
                 Stack(
                   children: [
-                    GestureDetector(
-                        onTapDown: (topDownDetails) {
-                          var position = topDownDetails.localPosition;
-                          Chess chess = _viewModel.play(currentShape == circle);
-                          setState(() {
-                            ChessPainter._position =
-                                Position(position.dx, position.dy, chess);
-                          });
-                        },
-                        child: Stack(
-                          children: [
-                            CustomPaint(
-                              size: Size(width, width),
-                              painter: CheckerBoardPainter(),
-                            ),
-                            CustomPaint(
-                              size: Size(width, width),
-                              painter: ChessPainter(turnAi),
-                            )
-                          ],
-                        )),
+                    Stack(
+                      children: [
+                        CustomPaint(
+                          size: Size(width, width),
+                          painter: CheckerBoardPainter(),
+                        ),
+                        CustomPaint(
+                          size: Size(width, width),
+                          painter: ChessPainter(turnAi, _originator),
+                        )
+                      ],
+                    ),
                     Visibility.maintain(
-                      visible: needChoose,
+                      visible: _originator.step == ck.Step.deploy,
                         child: Container(
                           width: width,
                           height: width,
@@ -169,7 +196,13 @@ class GamePageState extends State<GamePage> {
                                     child: GestureDetector(
                                       onTap: () {
                                         setState(() {
-                                          check[index] = check[index] == true? false: true;
+                                          if (check[index] == true) {
+                                            checkList.remove(index);
+                                            check[index] = false;
+                                          } else {
+                                            checkList.add(index);
+                                            check[index] = true;
+                                          }
                                         });
                                       },
                                       child: Container(
@@ -190,16 +223,9 @@ class GamePageState extends State<GamePage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
+
                       IconButton(
-                          onPressed: () {
-                            setState(() {
-                              needChoose = !needChoose;
-                            });
-                          },
-                          icon: Icon(Icons.arrow_right)),
-                      IconButton(
-                          onPressed: () {
-                            setState(() async {
+                          onPressed: () async {
                               var res = await showModalBottomSheet(
                               builder: (BuildContext context) {
                                 return HandBottomSheet(hands);
@@ -212,7 +238,6 @@ class GamePageState extends State<GamePage> {
                               if (res != null) {
                                 playCard(res);
                               }
-                            });
                           },
                           icon: Icon(Icons.book)),
                       // IconButton(
@@ -256,26 +281,26 @@ class GamePageState extends State<GamePage> {
                       //       Icons.sports_handball,
                       //       color: Colors.deepPurple,
                       //     )),
-                      IconButton(
-                          onPressed: () {
-                            TipsDialog.showByChoose(
-                                context, "提示", "是否重新开局？", "是", "否",
-                                (value) {
-                              if (value) {
-                                setState(() {
-                                  ChessPainter._position = null;
-                                  _originator.clean();
-                                  _viewModel.reset();
-                                  Ai.getInstance().init();
-                                });
-                              }
-                              Navigator.pop(context);
-                            });
-                          },
-                          icon: Icon(
-                            Icons.restart_alt,
-                            color: Colors.indigo,
-                          )),
+                      // IconButton(
+                      //     onPressed: () {
+                      //       TipsDialog.showByChoose(
+                      //           context, "提示", "是否重新开局？", "是", "否",
+                      //           (value) {
+                      //         if (value) {
+                      //           setState(() {
+                      //             ChessPainter._position = null;
+                      //             _originator.clean();
+                      //             _viewModel.reset();
+                      //             Ai.getInstance().init();
+                      //           });
+                      //         }
+                      //         Navigator.pop(context);
+                      //       });
+                      //     },
+                      //     icon: Icon(
+                      //       Icons.restart_alt,
+                      //       color: Colors.indigo,
+                      //     )),
                     ],
                   ),
                 ),
@@ -286,113 +311,104 @@ class GamePageState extends State<GamePage> {
   }
 
   void playCard(BaseCard card) {
-    needChoose = true;
-    stateMessage = sprintf("请点击合适的位置摆放%s", card.getCardName());
+    checkList = [];
+    check = {};
+    _originator.deploy(card);
     setState(() {
 
     });
   }
   /// Ai 下棋
   void turnAi() {
-    // print("Ai下棋");
-    if (ChessPainter._position!.chess is WhiteChess &&
-        Ai.getInstance().isWin(ChessPainter._position!.dx ~/ (width / 15),
-            ChessPainter._position!.dy ~/ (width / 15), 1)) {
-      TipsDialog.show(context, "恭喜", "您打败了决策树算法");
+    if (hasPlay == true) {
+
+      setState(() {
+        _originator.stepOver();
+        hasPlay = false;
+      });
     }
-    // 获取Ai下棋地址
-    Ai ai = Ai.getInstance();
-    ChessPainter._position = ai.searchPosition();
-    // 设置棋子外观
-    ChessPainter._position!.chess.chessShape = CircleShape();
-    // 加入决策中
-    Ai.getInstance().addChessman(ChessPainter._position!.dx.toInt(),
-        ChessPainter._position!.dy.toInt(), -1);
-    if (ChessPainter._position!.chess is BlackChess &&
-        Ai.getInstance().isWin(ChessPainter._position!.dx.toInt(),
-            ChessPainter._position!.dy.toInt(), -1)) {
-      TipsDialog.show(context, "很遗憾", "决策树算法打败了您");
-    }
-    setState(() {
-      ChessPainter._position!.dx = ChessPainter._position!.dx * (width / 15);
-      ChessPainter._position!.dy = ChessPainter._position!.dy * (width / 15);
-    });
   }
 }
 
 class ChessPainter extends CustomPainter {
   static int _state = 0;
-  static Position? _position;
   final Function _function;
-  Checkerboard _originator = Checkerboard.getInstance();
+  final ck.Checkerboard _originator;
 
-  ChessPainter(Function f) : _function = f;
+  ChessPainter(Function f, this._originator) : _function = f;
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (_position == null) {
-      return;
-    }
-    bool add = false;
-    double mWidth = size.width / 15;
-    double mHeight = size.height / 15;
+
+    double mWidth = size.width / 16;
+    double mHeight = size.height / 16;
     var mPaint = Paint();
-    //求两个点之间的距离,让棋子正确的显示在坐标轴上面
-    var dx = _position!.dx;
-    var dy = _position!.dy;
-    for (int i = 0; i < CheckerBoardPainter._crossOverBeanList.length; i++) {
-      var absX =
-          (dx - CheckerBoardPainter._crossOverBeanList[i]._dx).abs(); //两个点的x轴距离
-      var absY =
-          (dy - CheckerBoardPainter._crossOverBeanList[i]._dy).abs(); //两个点的y轴距离
-      var s = sqrt(absX * absX +
-          absY * absY); //利用直角三角形求斜边公式（a的平方 + b的平方 = c的平方）来计算出两点间的距离
-      if (s <= mWidth / 2 - 2) {
-        // 触摸点到棋盘坐标坐标点距离小于等于棋子半径，那么
-        //找到离触摸点最近的棋盘坐标点并记录保存下来
-        _position!.dx = CheckerBoardPainter._crossOverBeanList[i]._dx;
-        _position!.dy = CheckerBoardPainter._crossOverBeanList[i]._dy;
-        _originator.add(_position!);
-        add = true;
-        // if (_position!.chess is WhiteChess) {
-        //   Ai.getInstance().addChessman(
-        //       _position!.dx ~/ (width / 15), _position!.dy ~/ (width / 15), 1);
-        // }
-        // flag = false; //白子下完了，该黑子下了
-        break;
-      }
-    }
+
+
 
     //画子
     mPaint..style = PaintingStyle.fill;
     if (_originator.state.isNotEmpty) {
       for (int i = 0; i < _originator.state.length; i++) {
-        mPaint..color = _originator.state[i].chess.color;
-        if (_originator.state[i].chess.chessShape.shape == 1) {
-          canvas.drawCircle(
-              Offset(_originator.state[i].dx, _originator.state[i].dy),
-              min(mWidth / 2, mHeight / 2) - 2,
-              mPaint);
-        }
-        if (_originator.state[i].chess.chessShape.shape == 2) {
-          Rect rect = Rect.fromCircle(
-              center: Offset(_originator.state[i].dx, _originator.state[i].dy),
-              radius: min(mWidth / 2, mHeight / 2) - 2);
-          canvas.drawRect(rect, mPaint);
+        for (int j = 0; j < _originator.state.length; j++) {
+          if (_originator.state[i][j] == ck.SQState.town) {
+            mPaint..color = Colors.purple;
+            Rect rect = Rect.fromCircle(
+                center: Offset(CheckerBoardPainter._crossOverBeanList[i * 16 + j]._dx,
+                    CheckerBoardPainter._crossOverBeanList[i * 16 + j]._dy),
+                radius: min(mWidth / 2, mHeight / 2) - 2);
+            canvas.drawRect(rect, mPaint);
+          } else if (_originator.state[i][j] == ck.SQState.vil) {
+            mPaint..color = Colors.lightBlueAccent;
+            Rect rect = Rect.fromCircle(
+                center: Offset(CheckerBoardPainter._crossOverBeanList[i * 16 + j]._dx,
+                    CheckerBoardPainter._crossOverBeanList[i * 16 + j]._dy),
+                radius: min(mWidth / 2, mHeight / 2) - 2);
+            canvas.drawRect(rect, mPaint);
+          } else if (_originator.state[i][j] == ck.SQState.mine) {
+            mPaint..color = Colors.orangeAccent;
+            Rect rect = Rect.fromCircle(
+                center: Offset(CheckerBoardPainter._crossOverBeanList[i * 16 + j]._dx,
+                    CheckerBoardPainter._crossOverBeanList[i * 16 + j]._dy),
+                radius: min(mWidth / 2, mHeight / 2) - 2);
+            canvas.drawRect(rect, mPaint);
+          } else if (_originator.state[i][j] == ck.SQState.empty) {
+
+          } else {
+            mPaint..color = getColor(_originator.state[i][j]);
+
+            canvas.drawCircle(
+                Offset(CheckerBoardPainter._crossOverBeanList[i * 16 + j]._dx,
+                    CheckerBoardPainter._crossOverBeanList[i * 16 + j]._dy),
+                min(mWidth / 2, mHeight / 2) - 2,
+                mPaint);
+          }
         }
       }
     }
+
     WidgetsBinding.instance!.addPostFrameCallback((_) {
-      if (add && _position!.chess is WhiteChess) {
         _function();
-      }
     });
+
+
   }
 
   //在实际场景中正确利用此回调可以避免重绘开销，本示例我们简单的返回true
   @override
   bool shouldRepaint(CustomPainter oldDelegate) {
     return true;
+  }
+  Color getColor(ck.SQState state) {
+    if (state == ck.SQState.red) {
+      return Colors.red;
+    } else if (state == ck.SQState.yellow) {
+      return Colors.yellow;
+    } else if (state == ck.SQState.blue) {
+      return Colors.blue;
+    } else  {
+      return Colors.green;
+    }
   }
 }
 
@@ -448,6 +464,7 @@ class CheckerBoardPainter extends CustomPainter {
     return false;
   }
 }
+
 
 ///记录棋盘上横竖线的交叉点
 class CrossOverBean {
