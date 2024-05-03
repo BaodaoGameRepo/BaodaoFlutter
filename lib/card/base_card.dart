@@ -46,7 +46,7 @@ mixin BaseCard {
         for (int i = 0; i < cost.length; i++) {
             for (int j = 0; j < cost[i].length; j++) {
                 if (cost[i][j] == 1) {
-                    res[i * i + j * j] = res[i * i + j * j]?? 0 + 1;
+                    res[i * i + j * j] = (res[i * i + j * j]?? 0) + 1;
                 }
             }
         }
@@ -98,7 +98,7 @@ mixin BaseCard {
         return false;
     }
 
-    bool check(List<ck.Point> list, int dx, int dy) {
+    bool check(List<ck.Point> list, int dy, int dx) {
         Map<int, int> res = getRangeMap();
         for (ck.Point p in list) {
             int dis = (p.dx - dx) * (p.dx - dx) + (p.dy - dy) * (p.dy - dy);
@@ -110,4 +110,5 @@ mixin BaseCard {
         }
         return true;
     }
+
 }

@@ -3,6 +3,9 @@ import 'dart:math';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:gobang/bridge/ChessShape.dart';
+import 'package:gobang/card/card_black_bussinessman.dart';
+import 'package:gobang/card/card_bussinessman.dart';
+import 'package:gobang/card/card_holyknight.dart';
 import 'package:gobang/card/card_soldier.dart';
 import 'package:gobang/card/card_spearmen.dart';
 import 'package:gobang/card/card_swordsman.dart';
@@ -20,6 +23,7 @@ import 'package:sprintf/sprintf.dart';
 
 import 'bridge/CircleShape.dart';
 import 'card/base_card.dart';
+import 'common_widget/buy_bottom_sheet.dart';
 import 'common_widget/hand_bottom_sheet.dart';
 import 'common_widget/mj_text_shadow_container.dart';
 import 'factory/BlackThemeFactory.dart';
@@ -46,10 +50,12 @@ class GamePageState extends State<GamePage> {
   Icon rect = Icon(Icons.crop_square);
   Icon? currentLight, currentShape;
 
-  bool hasPlay = true;
+  bool hasPlay = false;
 
 
   List<BaseCard> hands = [];
+
+  List<BaseCard> store = [];
 
   @override
   void initState() {
@@ -61,6 +67,16 @@ class GamePageState extends State<GamePage> {
     hands.add(CardSwordsman());
     hands.add(CardSoldier());
     hands.add(CardSpearmen());
+
+    store.add(CardHolyKnight());
+    store.add(CardBussinessman());
+    store.add(CardHolyKnight());
+    store.add(CardBlackBussinessman());
+    store.add(CardSpearmen());
+    store.add(CardHolyKnight());
+    store.add(CardBussinessman());
+    store.add(CardSpearmen());
+    store.add(CardBlackBussinessman());
     super.initState();
   }
 
@@ -120,15 +136,32 @@ class GamePageState extends State<GamePage> {
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisSize: MainAxisSize.max,
               children: <Widget>[
-                if (_originator.step != ck.Step.empty)
+                if (_originator.taskStack.isNotEmpty)
                   MJTextShadowContainer(
                     width: 189.csp,
                     height: 48.csp,
                     text: "确认 >",
                     onTap: () {
-                      hasPlay = true;
-                      if (_originator.step == ck.Step.deploy) {
-                        int minX = 200, minY = 200, maxX = -1, maxY = -1;
+                      if (checkList.isEmpty) {
+                        TipsDialog.showByChoose(
+                            context, "提示", "是否跳过？", "是", "否",
+                                (value) {
+                              if (value) {
+                                _originator.taskStack.removeLast();
+                                setState(() {
+                                  _originator.nextStep();
+                                });
+                              }
+                              Navigator.pop(context);
+                            });
+                        return;
+                      }
+
+                      if (_originator.taskStack.last.state == ck.StepState.deploy) {
+                        int minX = 200,
+                            minY = 200,
+                            maxX = -1,
+                            maxY = -1;
                         List<ck.Point> points = checkList.map((e) {
                           int x = e ~/ 16;
                           int y = e % 16;
@@ -136,9 +169,37 @@ class GamePageState extends State<GamePage> {
                           if (x > maxX) maxX = x;
                           if (y < minY) minY = y;
                           if (y > maxY) maxY = y;
-                          return ck.Point(x, y, ck.SQState.red);
+                          return ck.Point(x, y, _originator.userColor[_originator.currentUser]);
                         }).toList();
-                        if (_originator.currentPlay?.checkPlayTheSame(points, minY, maxY, minX, maxX) == true) {
+                        if (_originator.taskStack.last.baseCard.checkPlayTheSame(points, minY, maxY, minX, maxX) == true) {
+                          if (_originator.checkNearby(points)) {
+                            hasPlay = true;
+                            setState(() {
+                              var s = _originator.taskStack.removeLast();
+                              _originator.updata(points);
+                              hands.remove(s.baseCard);
+                            });
+                          }
+                        } else {
+                          setState(() {
+                            _originator.stateMessage = "形状不正确";
+                          });
+                        }
+                      } else if (_originator.taskStack.last.state == ck.StepState.buy) {
+                        int minX = 200,
+                            minY = 200,
+                            maxX = -1,
+                            maxY = -1;
+                        List<ck.Point> points = checkList.map((e) {
+                          int x = e ~/ 16;
+                          int y = e % 16;
+                          if (x < minX) minX = x;
+                          if (x > maxX) maxX = x;
+                          if (y < minY) minY = y;
+                          if (y > maxY) maxY = y;
+                          return ck.Point(x, y, ck.SQState.empty);
+                        }).toList();
+                        if (_originator.taskStack.last.baseCard.checkTheSame(points, minY, maxY, minX, maxX) == true) {
                           setState(() {
                             _originator.updata(points);
                           });
@@ -147,10 +208,34 @@ class GamePageState extends State<GamePage> {
                             _originator.stateMessage = "形状不正确";
                           });
                         }
+                      } else if (_originator.taskStack.last.state == ck.StepState.fun_check_board) {
+                        int minX = 200,
+                            minY = 200,
+                            maxX = -1,
+                            maxY = -1;
+                        List<ck.Point> points = checkList.map((e) {
+                          int x = e ~/ 16;
+                          int y = e % 16;
+                          if (x < minX) minX = x;
+                          if (x > maxX) maxX = x;
+                          if (y < minY) minY = y;
+                          if (y > maxY) maxY = y;
+                          return ck.Point(x, y, ck.SQState.empty);
+                        }).toList();
+                        if ((_originator.taskStack.last.baseCard.checkTheSame(points, minY, maxY, minX, maxX) == true) &&
+                            _originator.checkIsYours(points)) {
+                            setState(() {
+                              var task = _originator.taskStack.removeLast();
+                              task.baseCard.funCheckerboard();
+                              _originator.nextStep();
+                            });
+                        } else {
+                          setState(() {
+                            _originator.stateMessage = "形状不正确";
+                          });
+                        }
                       }
-
-                    },
-                  ),
+                    }),
                 Padding(
                   padding: EdgeInsets.only(top: 14, bottom: 30),
                   child: Text(
@@ -174,7 +259,7 @@ class GamePageState extends State<GamePage> {
                       ],
                     ),
                     Visibility.maintain(
-                      visible: _originator.step == ck.Step.deploy,
+                      visible: _originator.taskStack.isNotEmpty,
                         child: Container(
                           width: width,
                           height: width,
@@ -227,19 +312,65 @@ class GamePageState extends State<GamePage> {
                       IconButton(
                           onPressed: () async {
                               var res = await showModalBottomSheet(
-                              builder: (BuildContext context) {
-                                return HandBottomSheet(hands);
-                              },
-                              isScrollControlled: true,
-                              enableDrag: false,
-                              backgroundColor: Colors.transparent,//重要
-                              context: context
+                                builder: (BuildContext context) {
+                                  return HandBottomSheet(hands);
+                                },
+                                isScrollControlled: true,
+                                enableDrag: false,
+                                backgroundColor: Colors.transparent,//重要
+                                context: context
                               );
                               if (res != null) {
-                                playCard(res);
+                                if (_originator.gameStep == ck.GameStep.deploy &&
+                                    _originator.taskStack.isEmpty) {
+                                  playCard(res);
+                                }
                               }
                           },
                           icon: Icon(Icons.book)),
+                      IconButton(
+                          onPressed: () async {
+                            var res = await showModalBottomSheet(
+                                builder: (BuildContext context) {
+                                  return BuyBottomSheet(store);
+                                },
+                                isScrollControlled: true,
+                                enableDrag: false,
+                                backgroundColor: Colors.transparent,//重要
+                                context: context
+                            );
+                            if (res != null) {
+                              buyCard(res);
+                            }
+                          },
+                          icon: Icon(Icons.monetization_on_rounded)),
+                      IconButton(
+                          onPressed: () {
+                            if (_originator.gameStep == ck.GameStep.deploy) {
+                              TipsDialog.showByChoose(
+                                  context, "提示", "是否要结束部署阶段？", "是", "否",
+                                      (value) {
+                                    if (value) {
+                                      _originator.gameStep = ck.GameStep.buy;
+                                    }
+                                    Navigator.pop(context);
+                                  });
+                            } else if (_originator.gameStep == ck.GameStep.buy) {
+                              TipsDialog.showByChoose(
+                                  context, "提示", "是否不进行购买？", "是", "否",
+                                      (value) {
+                                    if (value) {
+                                      _originator.nextTurn();
+                                      hands.clear();
+                                      hands.add(CardSwordsman());
+                                      hands.add(CardSwordsman());
+                                      hands.add(CardSpearmen());
+                                    }
+                                    Navigator.pop(context);
+                                  });
+                            }
+                          },
+                          icon: Icon(Icons.arrow_right)),
                       // IconButton(
                       //     onPressed: () {
                       //       if (_viewModel.undo()) {
@@ -318,13 +449,25 @@ class GamePageState extends State<GamePage> {
 
     });
   }
+
+  void buyCard(BaseCard card) {
+    checkList = [];
+    check = {};
+    _originator.buy(card);
+    setState(() {
+
+    });
+  }
+
   /// Ai 下棋
   void turnAi() {
     if (hasPlay == true) {
-
+      check = {};
+      checkList = [];
+      _originator.nextStep();
       setState(() {
-        _originator.stepOver();
         hasPlay = false;
+        _originator.nextStep();
       });
     }
   }
