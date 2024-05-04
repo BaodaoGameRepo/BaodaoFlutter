@@ -1,8 +1,11 @@
+import 'dart:math';
+
 import 'package:gobang/flyweight/Chess.dart';
 import 'package:gobang/flyweight/Position.dart';
 import 'package:sprintf/sprintf.dart';
 
 import '../card/base_card.dart';
+import 'UserReal.dart';
 
 enum SQState {
   red,
@@ -57,33 +60,123 @@ class Point {
 
 class Checkerboard {
   GameStep _gameStep = GameStep.deploy;
-
+  List<int> store = [];
   List<Step> taskStack = [];
-  List<String> userList = [];
-  List<SQState> userColor = [];
-  int currentUser = 0;
+  List<int> play = [];
+  List<UserReal> userList = [];
+  int _currentUser = 0;
   Checkerboard() {
-    userList = ["1mmm", "2kkk", "3ccc", "4bbb"];
-    userColor = [SQState.red, SQState.yellow, SQState.blue, SQState.green,];
-    currentUser = 0;
-    stateMessage = sprintf("%s的回合！", [userList[currentUser]]);
+    UserReal user = UserReal(initDecks(), initDis(), initHands(), 0, 0, 0, "1mmm", SQState.red);
+    userList.add(user);
+    user = UserReal(initDecks(), initDis(), initHands(), 0, 0, 0, "2kkk", SQState.yellow);
+    userList.add(user);
+    user = UserReal(initDecks(), initDis(), initHands(), 0, 0, 0, "3ccc", SQState.blue);
+    userList.add(user);
+    user = UserReal(initDecks(), initDis(), initHands(), 0, 0, 0, "4bbb", SQState.green);
+    userList.add(user);
+    store = initStore();
+    _currentUser = 0;
+    stateMessage = sprintf("%s的回合！", [userList[_currentUser].id]);
     for (int i = 0; i < 16; i++) {
       _state.add(List.filled(16, SQState.empty));
     }
     loadMap1();
   }
 
+  List<int> initHands() {
+    List<int> hands = [];
+    hands.add(0);
+    hands.add(0);
+    hands.add(1);
+    hands.add(0);
+    hands.add(6);
+    return hands;
+  }
+
+  List<int> initStore() {
+    List<int> store = [];
+    store.add(5);
+    store.add(4);
+    store.add(5);
+    store.add(3);
+    store.add(6);
+    store.add(5);
+    store.add(6);
+    store.add(6);
+    store.add(3);
+    return store;
+  }
+
+  List<int> initDis() {
+    List<int> store = [];
+    store.add(5);
+    store.add(4);
+    store.add(5);
+    return store;
+  }
+
+  List<int> initDecks() {
+    List<int> store = [];
+    store.add(5);
+    store.add(4);
+    store.add(5);
+    store.add(3);
+    return store;
+  }
+
+
   GameStep get gameStep => _gameStep;
 
+  UserReal currentUser() {
+    return userList[_currentUser];
+  }
+  
   set gameStep(GameStep value) {
     _gameStep = value;
   }
 
-  void nextTurn() {
-    currentUser = currentUser + 1;
-    if (currentUser == userList.length) {
-      currentUser = 0;
+  void draw(int num, UserReal cu) {
+    for (int i = 0; i < num; i++) {
+      if (cu.deck.isEmpty) {
+        cu.deck = shuffle(cu.discard);
+        cu.discard = [];
+      }
+      if (cu.deck.isEmpty) {
+        return;
+      }
+      cu.hands.add(cu.deck.first);
+      cu.deck.removeAt(0);
     }
+  }
+
+  int getRandomInt(int min,int max) {
+    final _random = new Random();
+    return _random.nextInt((max - min).floor()) + min;
+  }
+
+  List<int> shuffle(List<int> arr){
+    List<int> newArr = [];
+    newArr.addAll(arr);
+    for (var i = 1; i < newArr.length; i++){
+      var j = getRandomInt(0, i);
+      var t = newArr[i];
+      newArr[i] = newArr[j];
+      newArr[j] = t;
+    }
+    return newArr;
+  }
+
+  void nextTurn() {
+    var cu = currentUser();
+    cu.discard.addAll(play);
+    play = [];
+    draw(4 - cu.hands.length, cu);
+
+    _currentUser = _currentUser + 1;
+    if (_currentUser == userList.length) {
+      _currentUser = 0;
+    }
+    stateMessage = sprintf("%s的回合！", [userList[_currentUser].id]);
     gameStep = GameStep.deploy;
   }
 
@@ -141,15 +234,17 @@ class Checkerboard {
   }
 
   void buy(BaseCard card, {discount = 0}) {
+    appendTask(Step(StepState.end_buy, card));
     appendTask(Step(StepState.buy, card));
     stateMessage = sprintf("请点击合适的位置支付%s", [card.getCardName()]);
+    nextStep();
   }
 
 
   bool checkIsYours(List<Point> list, {int disCount = 0}) {
     int valid = 0;
     for (Point p in list) {
-      if (_state[p.dx][p.dy] == userColor[currentUser]) {
+      if (_state[p.dx][p.dy] == userList[_currentUser].color) {
         valid++;
       }
     }
@@ -162,26 +257,26 @@ class Checkerboard {
 
   bool checkNearby(List<Point> list) {
     for (Point p in list) {
-      if (_state[p.dx][p.dy] == userColor[currentUser]) {
+      if (_state[p.dx][p.dy] == userList[_currentUser].color) {
         return true;
       }
       if (p.dx > 0) {
-        if (_state[p.dx - 1][p.dy] == userColor[currentUser]) {
+        if (_state[p.dx - 1][p.dy] == userList[_currentUser].color) {
           return true;
         }
       }
       if (p.dx < 15) {
-        if (_state[p.dx + 1][p.dy] == userColor[currentUser]) {
+        if (_state[p.dx + 1][p.dy] == userList[_currentUser].color) {
           return true;
         }
       }
       if (p.dy > 0) {
-        if (_state[p.dx][p.dy - 1] == userColor[currentUser]) {
+        if (_state[p.dx][p.dy - 1] == userList[_currentUser].color) {
           return true;
         }
       }
       if (p.dy < 15) {
-        if (_state[p.dx][p.dy + 1] == userColor[currentUser]) {
+        if (_state[p.dx][p.dy + 1] == userList[_currentUser].color) {
           return true;
         }
       }
@@ -190,6 +285,7 @@ class Checkerboard {
   }
 
   void deploy(BaseCard card) {
+    appendTask(Step(StepState.end_deploy, card));
     if (card.playCount > 0) {
       taskStack.add(Step(StepState.deploy, card));
     }
@@ -217,6 +313,14 @@ class Checkerboard {
     }
     if (s.state == StepState.deploy) {
       stateMessage = "请点击合适的部署位置";
+    }
+    if (s.state == StepState.end_buy) {
+      taskStack.removeLast();
+      nextTurn();
+    }
+    if (s.state == StepState.end_deploy) {
+      taskStack.removeLast();
+      nextStep();
     }
 
   }

@@ -1,13 +1,13 @@
 import 'package:gobang/card/base_card.dart';
 import 'package:gobang/memorandum/Checkerboard.dart';
 
-class User extends Object {
+class UserReal extends Object {
 
-  List<BaseCard> deck;
+  late List<int> deck;
 
-  List<BaseCard> discard;
+  late List<int> discard;
 
-  List<BaseCard> hands;
+  late List<int> hands;
 
   int gold = 0;
 
@@ -19,6 +19,6 @@ class User extends Object {
 
   SQState color = SQState.empty;
 
-  User(this.deck,this.discard,this.hands,this.gold,this.point,this.prosperity,this.id,this.color,);
+  UserReal(this.deck,this.discard,this.hands,this.gold,this.point,this.prosperity,this.id,this.color,);
 
 }

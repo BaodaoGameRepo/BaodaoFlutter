@@ -35,6 +35,9 @@ class CardBlackBussinessman with BaseCard {
   get playCount => 2;
 
   @override
+  get cardId => 3;
+
+  @override
   void funCheckerboard() {
 
   }

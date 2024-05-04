@@ -35,6 +35,9 @@ class CardHolyKnight with BaseCard {
   get playCount => 3;
 
   @override
+  get cardId => 5;
+
+  @override
   void funCheckerboard() {
 
   }

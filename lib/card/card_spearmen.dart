@@ -32,6 +32,9 @@ class CardSpearmen with BaseCard {
   get playCount => 4;
 
   @override
+  get cardId => 6;
+
+  @override
   void funCheckerboard() {
 
   }

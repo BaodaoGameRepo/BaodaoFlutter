@@ -4,6 +4,7 @@ import 'package:gobang/card/card_badknight.dart';
 import 'package:gobang/card/card_swordsman.dart';
 import 'package:gobang/common_widget/constants/mj_colors.dart';
 import 'package:gobang/common_widget/screen_sp.dart';
+import 'package:gobang/flyweight/CardFactory.dart';
 import 'package:sprintf/sprintf.dart';
 
 import '../../common_widget/nav_bar.dart';
@@ -13,7 +14,7 @@ import '../nav_service.dart';
 
 class BuyBottomSheet extends StatefulWidget {
 
-  final List<BaseCard> cards;
+  final List<int> cards;
 
   const BuyBottomSheet(this.cards, {Key? key}) : super(key: key);
 
@@ -32,7 +33,7 @@ class _BuyBottomSheetState extends State<BuyBottomSheet> {
 
   Widget buildNavBar() {
     return NavBar(
-      title: "手牌",
+      title: "商店",
       isAlert: true,
       height: 40.csp,
       backgroundColor: MJColors.white,
@@ -46,9 +47,15 @@ class _BuyBottomSheetState extends State<BuyBottomSheet> {
       actions: <Widget>[
         GestureDetector(
             onTap: () {
+              if (choose == 9) {
+                navService.closePage(1);
+              } else if (choose == 10) {
+                navService.closePage(2);
+              }
               if (choose != -1) {
                 navService.closePage(widget.cards[choose]);
               }
+
             },
             child: Container(
               child: Text(
@@ -70,7 +77,7 @@ class _BuyBottomSheetState extends State<BuyBottomSheet> {
   Widget build(BuildContext context) {
 
     List<Widget> list = [];
-    List<Widget> cards = widget.cards.asMap().map((i, v) => MapEntry(i, buildChildItem(i, v))).values.toList();
+    List<Widget> cards = widget.cards.asMap().map((i, v) => MapEntry(i, buildChildItem(i, CardFactory.getInstance().getBaseCard(v)))).values.toList();
 
 
     for (int i = 0; i <= 1; i++) {

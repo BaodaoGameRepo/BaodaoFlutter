@@ -2,17 +2,10 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:gobang/bridge/ChessShape.dart';
-import 'package:gobang/card/card_black_bussinessman.dart';
-import 'package:gobang/card/card_bussinessman.dart';
-import 'package:gobang/card/card_holyknight.dart';
-import 'package:gobang/card/card_soldier.dart';
-import 'package:gobang/card/card_spearmen.dart';
-import 'package:gobang/card/card_swordsman.dart';
 import 'package:gobang/common_widget/constants/mj_colors.dart';
 import 'package:gobang/common_widget/screen_sp.dart';
 import 'package:gobang/factory/ThemeFactory.dart';
-import 'package:gobang/factory/BlueTheme.dart';
+import 'package:gobang/flyweight/CardFactory.dart';
 import 'package:gobang/flyweight/Chess.dart';
 import 'package:gobang/flyweight/ChessFlyweightFactory.dart';
 import 'package:gobang/memorandum/Checkerboard.dart' as ck;
@@ -49,34 +42,14 @@ class GamePageState extends State<GamePage> {
   Icon circle = Icon(Icons.circle_outlined);
   Icon rect = Icon(Icons.crop_square);
   Icon? currentLight, currentShape;
-
   bool hasPlay = false;
-
-
-  List<BaseCard> hands = [];
-
-  List<BaseCard> store = [];
 
   @override
   void initState() {
     currentLight = lightOn;
     _themeFactory = BlueThemeFactory();
     currentShape = circle;
-    hands.add(CardSoldier());
-    hands.add(CardSoldier());
-    hands.add(CardSwordsman());
-    hands.add(CardSoldier());
-    hands.add(CardSpearmen());
 
-    store.add(CardHolyKnight());
-    store.add(CardBussinessman());
-    store.add(CardHolyKnight());
-    store.add(CardBlackBussinessman());
-    store.add(CardSpearmen());
-    store.add(CardHolyKnight());
-    store.add(CardBussinessman());
-    store.add(CardSpearmen());
-    store.add(CardBlackBussinessman());
     super.initState();
   }
 
@@ -169,7 +142,7 @@ class GamePageState extends State<GamePage> {
                           if (x > maxX) maxX = x;
                           if (y < minY) minY = y;
                           if (y > maxY) maxY = y;
-                          return ck.Point(x, y, _originator.userColor[_originator.currentUser]);
+                          return ck.Point(x, y, _originator.currentUser().color);
                         }).toList();
                         if (_originator.taskStack.last.baseCard.checkPlayTheSame(points, minY, maxY, minX, maxX) == true) {
                           if (_originator.checkNearby(points)) {
@@ -177,7 +150,8 @@ class GamePageState extends State<GamePage> {
                             setState(() {
                               var s = _originator.taskStack.removeLast();
                               _originator.updata(points);
-                              hands.remove(s.baseCard);
+                              _originator.play.add(s.baseCard.cardId);
+                              _originator.currentUser().hands.remove(s.baseCard.cardId);
                             });
                           }
                         } else {
@@ -199,9 +173,13 @@ class GamePageState extends State<GamePage> {
                           if (y > maxY) maxY = y;
                           return ck.Point(x, y, ck.SQState.empty);
                         }).toList();
-                        if (_originator.taskStack.last.baseCard.checkTheSame(points, minY, maxY, minX, maxX) == true) {
+                        if ((_originator.taskStack.last.baseCard.checkTheSame(points, minY, maxY, minX, maxX) == true)
+                          && _originator.checkIsYours(points)) {
                           setState(() {
                             _originator.updata(points);
+                            var task = _originator.taskStack.removeLast();
+                            task.baseCard.funBuy();
+                            _originator.nextStep();
                           });
                         } else {
                           setState(() {
@@ -313,7 +291,7 @@ class GamePageState extends State<GamePage> {
                           onPressed: () async {
                               var res = await showModalBottomSheet(
                                 builder: (BuildContext context) {
-                                  return HandBottomSheet(hands);
+                                  return HandBottomSheet(_originator.currentUser().hands);
                                 },
                                 isScrollControlled: true,
                                 enableDrag: false,
@@ -332,7 +310,7 @@ class GamePageState extends State<GamePage> {
                           onPressed: () async {
                             var res = await showModalBottomSheet(
                                 builder: (BuildContext context) {
-                                  return BuyBottomSheet(store);
+                                  return BuyBottomSheet(_originator.store);
                                 },
                                 isScrollControlled: true,
                                 enableDrag: false,
@@ -346,12 +324,17 @@ class GamePageState extends State<GamePage> {
                           icon: Icon(Icons.monetization_on_rounded)),
                       IconButton(
                           onPressed: () {
-                            if (_originator.gameStep == ck.GameStep.deploy) {
+                            if (_originator.taskStack.isNotEmpty) {
+                              TipsDialog.show(context, "有操作未完成", "操作未完成，请继续操作");
+                            } else if (_originator.gameStep == ck.GameStep.deploy) {
                               TipsDialog.showByChoose(
                                   context, "提示", "是否要结束部署阶段？", "是", "否",
                                       (value) {
                                     if (value) {
-                                      _originator.gameStep = ck.GameStep.buy;
+                                      setState(() {
+                                        _originator.gameStep = ck.GameStep.buy;
+                                        _originator.stateMessage = "请点击下方商店购买卡牌";
+                                      });
                                     }
                                     Navigator.pop(context);
                                   });
@@ -360,78 +343,15 @@ class GamePageState extends State<GamePage> {
                                   context, "提示", "是否不进行购买？", "是", "否",
                                       (value) {
                                     if (value) {
-                                      _originator.nextTurn();
-                                      hands.clear();
-                                      hands.add(CardSwordsman());
-                                      hands.add(CardSwordsman());
-                                      hands.add(CardSpearmen());
+                                      setState(() {
+                                        _originator.nextTurn();
+                                      });
                                     }
                                     Navigator.pop(context);
                                   });
                             }
                           },
                           icon: Icon(Icons.arrow_right)),
-                      // IconButton(
-                      //     onPressed: () {
-                      //       if (_viewModel.undo()) {
-                      //         _originator.undo();
-                      //         Ai.getInstance().init();
-                      //         for (Position po in _originator.state) {
-                      //           Ai.getInstance().addChessman(
-                      //               po.dx ~/ (width / 15),
-                      //               po.dy ~/ (width / 15),
-                      //               po.chess is WhiteChess ? 1 : -1);
-                      //         }
-                      //         setState(() {});
-                      //       } else {
-                      //         TipsDialog.show(context, "提示", "现阶段不能悔棋");
-                      //       }
-                      //     },
-                      //     icon: Icon(Icons.undo)),
-                      // IconButton(
-                      //     onPressed: () {
-                      //       if (_viewModel.surrender()) {
-                      //         TipsDialog.showByChoose(
-                      //             context, "提示", "是否要投降并重新开局？", "是", "否",
-                      //             (value) {
-                      //           if (value) {
-                      //             setState(() {
-                      //               ChessPainter._position = null;
-                      //               _originator.clean();
-                      //               _viewModel.reset();
-                      //               Ai.getInstance().init();
-                      //             });
-                      //           }
-                      //           Navigator.pop(context);
-                      //         });
-                      //       } else {
-                      //         TipsDialog.show(context, "提示", "现阶段不能投降");
-                      //       }
-                      //     },
-                      //     icon: Icon(
-                      //       Icons.sports_handball,
-                      //       color: Colors.deepPurple,
-                      //     )),
-                      // IconButton(
-                      //     onPressed: () {
-                      //       TipsDialog.showByChoose(
-                      //           context, "提示", "是否重新开局？", "是", "否",
-                      //           (value) {
-                      //         if (value) {
-                      //           setState(() {
-                      //             ChessPainter._position = null;
-                      //             _originator.clean();
-                      //             _viewModel.reset();
-                      //             Ai.getInstance().init();
-                      //           });
-                      //         }
-                      //         Navigator.pop(context);
-                      //       });
-                      //     },
-                      //     icon: Icon(
-                      //       Icons.restart_alt,
-                      //       color: Colors.indigo,
-                      //     )),
                     ],
                   ),
                 ),
@@ -441,21 +361,22 @@ class GamePageState extends State<GamePage> {
     );
   }
 
-  void playCard(BaseCard card) {
+  void playCard(int cardId) {
     checkList = [];
     check = {};
+    BaseCard card = CardFactory.getInstance().getBaseCard(cardId);
     _originator.deploy(card);
     setState(() {
 
     });
   }
 
-  void buyCard(BaseCard card) {
+  void buyCard(int cardId) {
     checkList = [];
     check = {};
-    _originator.buy(card);
+    BaseCard card = CardFactory.getInstance().getBaseCard(cardId);
     setState(() {
-
+      _originator.buy(card);
     });
   }
 
@@ -464,7 +385,6 @@ class GamePageState extends State<GamePage> {
     if (hasPlay == true) {
       check = {};
       checkList = [];
-      _originator.nextStep();
       setState(() {
         hasPlay = false;
         _originator.nextStep();

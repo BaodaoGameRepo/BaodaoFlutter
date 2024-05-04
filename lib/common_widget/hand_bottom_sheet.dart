@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gobang/common_widget/constants/mj_colors.dart';
 import 'package:gobang/common_widget/screen_sp.dart';
+import 'package:gobang/flyweight/CardFactory.dart';
 
 import '../../common_widget/nav_bar.dart';
 import '../card/base_card.dart';
@@ -10,7 +11,7 @@ import '../nav_service.dart';
 
 class HandBottomSheet extends StatefulWidget {
 
-  final List<BaseCard> cards;
+  final List<int> cards;
 
   const HandBottomSheet(this.cards, {Key? key}) : super(key: key);
 
@@ -91,7 +92,8 @@ class _HandBottomSheetState extends State<HandBottomSheet> {
                             child: Wrap(
                               runSpacing: 7.csp,
                               spacing: 7.csp,
-                              children: widget.cards.asMap().map((i, v) => MapEntry(i, buildChildItem(i, v))).values.toList(),
+                              children: widget.cards.asMap().map((i, v) =>
+                                  MapEntry(i, buildChildItem(i, CardFactory.getInstance().getBaseCard(v)))).values.toList(),
                             ),
                           )
                         ],

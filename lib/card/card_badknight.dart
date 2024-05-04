@@ -33,6 +33,9 @@ class CardBadKnight with BaseCard {
   get playCount => 3;
 
   @override
+  get cardId => 2;
+
+  @override
   void funCheckerboard() {
 
   }

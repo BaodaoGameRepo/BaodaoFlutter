@@ -32,6 +32,9 @@ class CardSwordsman with BaseCard {
   get playCount => 2;
 
   @override
+  get cardId => 1;
+
+  @override
   void funCheckerboard() {
 
   }

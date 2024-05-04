@@ -2,6 +2,8 @@ import 'package:gobang/memorandum/Checkerboard.dart' as ck;
 
 mixin BaseCard {
 
+    get cardId => 0;
+
     String getCardName() {
       return "";
     }

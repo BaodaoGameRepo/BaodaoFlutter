@@ -35,6 +35,9 @@ class CardBussinessman with BaseCard {
   get playCount => 1;
 
   @override
+  get cardId => 4;
+
+  @override
   void funBuy() {
 
   }
