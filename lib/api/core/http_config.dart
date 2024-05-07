@@ -22,7 +22,7 @@ abstract class HttpBaseConfig {
 
 class HttpConfig extends HttpBaseConfig {
   @override
-  String get baseUrl => 'https://api.dev.desktop.xiaochuanai.com:30443';
+  String get baseUrl => 'http://47.92.81.188:8090/';
 
   @override
   String get contentType => "application/json";
@@ -30,7 +30,7 @@ class HttpConfig extends HttpBaseConfig {
 
 class HttpUpdateConfig extends HttpBaseConfig {
   @override
-  String get baseUrl => 'http://104.171.202.53:5000/';
+  String get baseUrl => 'http://47.92.81.188:8090/';
 
   @override
   String get contentType => 'application/json;charset=utf-8';

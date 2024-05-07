@@ -3,6 +3,8 @@ import 'package:gobang/memorandum/Checkerboard.dart';
 
 class UserReal extends Object {
 
+  late int turnOrder;
+
   late List<int> deck;
 
   late List<int> discard;
@@ -19,6 +21,17 @@ class UserReal extends Object {
 
   SQState color = SQState.empty;
 
-  UserReal(this.deck,this.discard,this.hands,this.gold,this.point,this.prosperity,this.id,this.color,);
+  UserReal(this.turnOrder, this.deck,this.discard,this.hands,this.gold,this.point,this.prosperity,this.id,this.color,);
 
+  void gainGold(int value) {
+    gold = gold + value;
+  }
+
+  void gainPoint(int value) {
+    point = point + value;
+  }
+
+  void gainProsperity(int value) {
+    prosperity = prosperity + value;
+  }
 }

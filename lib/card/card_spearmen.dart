@@ -1,5 +1,7 @@
 import 'package:gobang/card/base_card.dart';
 
+import '../memorandum/Checkerboard.dart';
+
 class CardSpearmen with BaseCard {
 
   @override
@@ -35,7 +37,7 @@ class CardSpearmen with BaseCard {
   get cardId => 6;
 
   @override
-  void funCheckerboard() {
-
+  void funCheckerboard(Checkerboard checkerboard) {
+      checkerboard.currentUser().discard.add(2);
   }
 }

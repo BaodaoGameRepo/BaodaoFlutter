@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:gobang/memorandum/game_bean.dart';
 
 
 typedef FromJson<T> = T Function(dynamic json);
@@ -62,9 +63,9 @@ class ClientResponse<T> {
 
   static T? fromJsonT<T>(Map<String, dynamic> map) {
     final name = T.toString();
-    // if (name == BatchResponse.className) {
-    //   return BatchResponse.fromJson(map) as T;
-    // }
+    if (name == GameBean.className) {
+      return GameBean.fromJson(map) as T;
+    }
     return map as T;
   }
 

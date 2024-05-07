@@ -1,5 +1,7 @@
 import 'package:gobang/card/base_card.dart';
 
+import '../memorandum/Checkerboard.dart';
+
 class CardSoldier with BaseCard {
 
   @override
@@ -32,7 +34,7 @@ class CardSoldier with BaseCard {
   get playCount => 1;
 
   @override
-  void funPlay() {
+  void funPlay(Checkerboard checkerboard) {
 
   }
 }

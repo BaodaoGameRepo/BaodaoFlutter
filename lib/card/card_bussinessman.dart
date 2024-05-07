@@ -1,5 +1,7 @@
 import 'package:gobang/card/base_card.dart';
 
+import '../memorandum/Checkerboard.dart';
+
 class CardBussinessman with BaseCard {
 
   @override
@@ -38,12 +40,12 @@ class CardBussinessman with BaseCard {
   get cardId => 4;
 
   @override
-  void funBuy() {
+  void funBuy(Checkerboard checkerboard) {
 
   }
 
   @override
-  void funPlay() {
+  void funPlay(Checkerboard checkerboard) {
 
   }
 }

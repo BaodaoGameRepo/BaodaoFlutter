@@ -30,15 +30,15 @@ mixin BaseCard {
 
     get hasPlay => false;
 
-    void funBuy() {
+    void funBuy(ck.Checkerboard checkerboard) {
 
     }
 
-    void funCheckerboard() {
+    void funCheckerboard(ck.Checkerboard checkerboard) {
 
     }
 
-    void funPlay() {
+    void funPlay(ck.Checkerboard checkerboard) {
 
     }
 

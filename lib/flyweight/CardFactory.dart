@@ -9,6 +9,8 @@ import 'package:gobang/card/card_spearmen.dart';
 import 'package:gobang/card/card_swordsman.dart';
 import 'package:gobang/flyweight/Chess.dart';
 
+import '../card/card_treasure.dart';
+
 /// 棋子的享元工厂，采用单例模式
 class CardFactory {
   CardFactory._();
@@ -30,6 +32,9 @@ class CardFactory {
       card = _hashMap[type]!;
     } else {
       switch (type) {
+        case -1:
+          card = CardTreasure();
+          break;
         case 0:
           card = CardSoldier();
           break;

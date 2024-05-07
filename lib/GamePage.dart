@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:gobang/common_widget/card_bottom_sheet.dart';
 import 'package:gobang/common_widget/constants/mj_colors.dart';
 import 'package:gobang/common_widget/screen_sp.dart';
 import 'package:gobang/factory/ThemeFactory.dart';
@@ -109,13 +110,23 @@ class GamePageState extends State<GamePage> {
               crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisSize: MainAxisSize.max,
               children: <Widget>[
+                Container(
+                  width: MediaQuery.of(context).size.width,
+                  padding: EdgeInsets.only(bottom: 20.csp),
+                  child: Text(
+                    sprintf("gold: %d, point: %d, prosperity: %d",
+                        [_originator.currentUser().gold, _originator.currentUser().point, _originator.currentUser().prosperity]),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
                 if (_originator.taskStack.isNotEmpty)
                   MJTextShadowContainer(
                     width: 189.csp,
                     height: 48.csp,
                     text: "确认 >",
                     onTap: () {
-                      if (checkList.isEmpty) {
+                      var task = _originator.taskStack.last;
+                      if ((task.state == ck.StepState.fun_check_board || task.state == ck.StepState.card_remove) && checkList.isEmpty) {
                         TipsDialog.showByChoose(
                             context, "提示", "是否跳过？", "是", "否",
                                 (value) {
@@ -129,8 +140,7 @@ class GamePageState extends State<GamePage> {
                             });
                         return;
                       }
-
-                      if (_originator.taskStack.last.state == ck.StepState.deploy) {
+                      if (task.state == ck.StepState.deploy) {
                         int minX = 200,
                             minY = 200,
                             maxX = -1,
@@ -144,14 +154,18 @@ class GamePageState extends State<GamePage> {
                           if (y > maxY) maxY = y;
                           return ck.Point(x, y, _originator.currentUser().color);
                         }).toList();
-                        if (_originator.taskStack.last.baseCard.checkPlayTheSame(points, minY, maxY, minX, maxX) == true) {
+                        if (task.baseCard.checkPlayTheSame(points, minY, maxY, minX, maxX) == true) {
                           if (_originator.checkNearby(points)) {
+                            int num = _originator.removePoints(points);
                             hasPlay = true;
                             setState(() {
                               var s = _originator.taskStack.removeLast();
                               _originator.updata(points);
                               _originator.play.add(s.baseCard.cardId);
                               _originator.currentUser().hands.remove(s.baseCard.cardId);
+                              if (num > 0) {
+                                _originator.taskStack.add(ck.Step(ck.StepState.undeploy, s.baseCard, disCount: num * 2));
+                              }
                             });
                           }
                         } else {
@@ -159,7 +173,7 @@ class GamePageState extends State<GamePage> {
                             _originator.stateMessage = "形状不正确";
                           });
                         }
-                      } else if (_originator.taskStack.last.state == ck.StepState.buy) {
+                      } else if (task.state == ck.StepState.undeploy) {
                         int minX = 200,
                             minY = 200,
                             maxX = -1,
@@ -173,12 +187,38 @@ class GamePageState extends State<GamePage> {
                           if (y > maxY) maxY = y;
                           return ck.Point(x, y, ck.SQState.empty);
                         }).toList();
-                        if ((_originator.taskStack.last.baseCard.checkTheSame(points, minY, maxY, minX, maxX) == true)
-                          && _originator.checkIsYours(points)) {
+                        if (_originator.checkIsYours(points) && points.length == task.disCount) {
+                          _originator.updata(points);
                           setState(() {
-                            _originator.updata(points);
-                            var task = _originator.taskStack.removeLast();
-                            task.baseCard.funBuy();
+                            _originator.nextStep();
+                          });
+                        } else {
+                          setState(() {
+                            _originator.stateMessage = "移除不正确";
+                          });
+                        }
+                      } else if (task.state == ck.StepState.buy) {
+                        int minX = 200,
+                            minY = 200,
+                            maxX = -1,
+                            maxY = -1;
+                        List<ck.Point> points = checkList.map((e) {
+                          int x = e ~/ 16;
+                          int y = e % 16;
+                          if (x < minX) minX = x;
+                          if (x > maxX) maxX = x;
+                          if (y < minY) minY = y;
+                          if (y > maxY) maxY = y;
+                          return ck.Point(x, y, ck.SQState.empty);
+                        }).toList();
+                        if ((task.baseCard.checkTheSame(points, minY, maxY, minX, maxX) == true)
+                          && _originator.checkIsYours(points, disCount: task.disCount)) {
+                          setState(() {
+                            _originator.taskStack.removeLast();
+                            var s = ck.Step(ck.StepState.discount, task.baseCard, disCount: task.disCount);
+                            s.points = checkList;
+                            _originator.taskStack.add(s);
+                            _originator.stateMessage = "请选择实际支付部分，其余部分将用金币抵扣";
                             _originator.nextStep();
                           });
                         } else {
@@ -186,7 +226,25 @@ class GamePageState extends State<GamePage> {
                             _originator.stateMessage = "形状不正确";
                           });
                         }
-                      } else if (_originator.taskStack.last.state == ck.StepState.fun_check_board) {
+                      } else if (task.state == ck.StepState.discount) {
+                          if (task.points.length - task.disCount - checkList.length > _originator.currentUser().gold
+                           || !_originator.contain(checkList, task.points)) {
+                            _originator.stateMessage = "保留不正确";
+                          } else {
+                            List<ck.Point> points = checkList.map((e) {
+                              int x = e ~/ 16;
+                              int y = e % 16;
+                              return ck.Point(x, y, ck.SQState.empty);
+                            }).toList();
+                            if (_originator.checkIsYours(points)) {
+                              _originator.updata(points);
+                              var task = _originator.taskStack.removeLast();
+                              _originator.currentUser().gainGold(task.disCount - task.points.length + checkList.length);
+                              task.baseCard.funBuy(_originator);
+                              _originator.nextStep();
+                            }
+                          }
+                      } else if (task.state == ck.StepState.fun_check_board) {
                         int minX = 200,
                             minY = 200,
                             maxX = -1,
@@ -200,11 +258,13 @@ class GamePageState extends State<GamePage> {
                           if (y > maxY) maxY = y;
                           return ck.Point(x, y, ck.SQState.empty);
                         }).toList();
-                        if ((_originator.taskStack.last.baseCard.checkTheSame(points, minY, maxY, minX, maxX) == true) &&
+                        if ((task.baseCard.checkTheSame(points, minY, maxY, minX, maxX) == true) &&
                             _originator.checkIsYours(points)) {
                             setState(() {
-                              var task = _originator.taskStack.removeLast();
-                              task.baseCard.funCheckerboard();
+                              _originator.taskStack.removeLast();
+                              task.baseCard.funCheckerboard(_originator);
+                              checkList = [];
+                              check = {};
                               _originator.nextStep();
                             });
                         } else {
@@ -307,6 +367,32 @@ class GamePageState extends State<GamePage> {
                           },
                           icon: Icon(Icons.book)),
                       IconButton(
+                          onPressed: () {
+                            showModalBottomSheet(
+                                builder: (BuildContext context) {
+                                  return CardBottomSheet(_originator.play, "出牌区");
+                                },
+                                isScrollControlled: true,
+                                enableDrag: false,
+                                backgroundColor: Colors.transparent,//重要
+                                context: context
+                            );
+                          },
+                          icon: Icon(Icons.play_circle)),
+                      IconButton(
+                          onPressed: () {
+                            showModalBottomSheet(
+                                builder: (BuildContext context) {
+                                  return CardBottomSheet(_originator.currentUser().discard, "弃牌堆");
+                                },
+                                isScrollControlled: true,
+                                enableDrag: false,
+                                backgroundColor: Colors.transparent,//重要
+                                context: context
+                            );
+                          },
+                          icon: Icon(Icons.pause_circle)),
+                      IconButton(
                           onPressed: () async {
                             var res = await showModalBottomSheet(
                                 builder: (BuildContext context) {
@@ -344,6 +430,8 @@ class GamePageState extends State<GamePage> {
                                       (value) {
                                     if (value) {
                                       setState(() {
+
+                                        _originator.fillStore();
                                         _originator.nextTurn();
                                       });
                                     }
