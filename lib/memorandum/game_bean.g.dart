@@ -62,7 +62,7 @@ Map<String, dynamic> _$BuildingToJson(Building instance) => <String, dynamic>{
 
 Disturb _$DisturbFromJson(Map<String, dynamic> json) => Disturb(
       (json['type'] as num).toInt(),
-      json['usr'] as String,
+      (json['usr'] as num).toInt(),
       (json['number'] as num).toInt(),
     );
 

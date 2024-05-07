@@ -1,13 +1,19 @@
+import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/cupertino.dart';
 import 'package:gobang/api/core/update_client.dart';
+import 'package:gobang/flyweight/CardFactory.dart';
 import 'package:gobang/flyweight/Chess.dart';
 import 'package:gobang/flyweight/Position.dart';
 import 'package:gobang/memorandum/game_bean.dart';
+import 'package:gobang/memorandum/push_game_request.dart';
+import 'package:gobang/user_services.dart';
 import 'package:sprintf/sprintf.dart';
 
 import '../api/core/app_client.dart';
 import '../card/base_card.dart';
+import '../utils/TipsDialog.dart';
 import 'UserReal.dart';
 import 'get_game_request.dart';
 
@@ -32,6 +38,7 @@ enum SQState {
 enum StepState {
   end_deploy,
   end_buy,
+  expand,
   deploy,
   buy,
   discount,
@@ -46,7 +53,8 @@ class Step {
   BaseCard baseCard;
   int disCount;
   List<int> points = [];
-  Step(this.state, this.baseCard, {this.disCount = 0});
+  Disturb? dis;
+  Step(this.state, this.baseCard, {this.disCount = 0, this.dis});
 }
 
 
@@ -73,27 +81,20 @@ class Buildings {
   Buildings(this.points, this.type, {this.number = 0});
 }
 
-class Disturb {
-  int type = 0;
-  int number = 0;
-  // 0表示包围城市第一名， 1表示包围村庄第一名， 2表示移除
-  String user = "";
-  Disturb(this.type, this.user, this.number);
-}
-
-
 
 class Checkerboard {
   GameStep _gameStep = GameStep.deploy;
   List<int> store = [];
   List<int> legendStore = [];
   List<int> deck = [];
+  List<Disturb> event = [];
   List<int> discard = [];
   List<Buildings> builds = [];
   List<Step> taskStack = [];
   List<int> play = [];
   List<UserReal> userList = [];
   int _currentUser = 0;
+  BuildContext? context;
   Checkerboard() {
     UserReal user = UserReal(0, initDecks(), initDis(), initHands(), 0, 0, 0, "1mmm", SQState.red);
     userList.add(user);
@@ -111,18 +112,70 @@ class Checkerboard {
       _state.add(List.filled(16, SQState.empty));
     }
     loadMap1();
-    initReq();
   }
 
-  void uploadGame() {
-
+  void uploadGame() async {
+    GameBean res = GameBean(
+      "2",
+      1, 
+      getMapString(),
+      builds.map((build) =>
+        Building(build.points.map((e) => e.dx * 16 + e.dy).toList(),
+            build.belongs, getBuildingType(build.type), build.number)
+      ).toList(),
+      event,
+      _currentUser,
+      legendStore,
+      store,
+      deck,
+      play,
+      discard,
+      userList.map((e) => User(e.deck, e.discard,
+          e.hands, e.gold, e.point, e.prosperity, e.id, getString(e.color), e.turnOrder)).toList()
+    );
+    String s = json.encode(res.toJson());
+    var resp = await updateClient.request(PushGameRequest("2", s));
+    if (resp.data['status'] == "success") {
+      if (context != null) {
+        TipsDialog.show(context!, "上传成功！", "上传进度成功！");
+      } else {
+        print("上传进度成功！");
+      }
+    }
+  }
+  
+  String getBuildingType(SQState s) {
+    switch (s) {
+      case SQState.mine:
+        return "mine";
+      case SQState.town:
+        return "town";
+      case SQState.vil:
+        return "vil";
+      default:
+        return "mine";
+    }
   }
 
-  void initReq() async {
+  bool isCurrentUser() {
+    return userServices.user == currentUser().id;
+  }
+
+  initReq() async {
     var res = await updateClient.request<GameBean>(GetGameRequest("2"));
     GameBean? resp = res.data;
     deck = resp?.deck?? [];
     store = resp?.normal?? [];
+    event = resp?.disturb?? [];
+    if (event.isNotEmpty && isCurrentUser()) {
+      for (Disturb d in event) {
+        if (d.usr == currentUser().turnOrder) {
+          taskStack.add(Step(StepState.expand, CardFactory.getInstance().getBaseCard(0),
+              dis: d));
+          event.remove(d);
+        }
+      }
+    }
     legendStore = resp?.legend?? [];
     userList = [];
     for (User u in resp?.user?? []) {
@@ -164,6 +217,37 @@ class Checkerboard {
         l.add(getColor(map.substring(i * 16 + 15)));
       }
       _state.add(l);
+    }
+  }
+
+  String getMapString() {
+    String s = "";
+    for (int i = 0; i < 16; i++) {
+      for (int j = 0; j < 16; j++) {
+        s = s + getString(_state[i][j]);
+      }
+    }
+    return s;
+  }
+
+  String getString(SQState s) {
+    switch (s) {
+      case SQState.red:
+        return "r";
+      case SQState.yellow:
+        return "y";
+      case SQState.blue:
+        return "b";
+      case SQState.green:
+        return "g";
+      case SQState.empty:
+        return "0";
+      case SQState.mine:
+        return "m";
+      case SQState.town:
+        return "t";
+      case SQState.vil:
+        return "v";
     }
   }
 
@@ -287,13 +371,13 @@ class Checkerboard {
     cu.discard.addAll(play);
     play = [];
     draw(4 - cu.hands.length, cu);
-
     _currentUser = _currentUser + 1;
     if (_currentUser == userList.length) {
       _currentUser = 0;
     }
     stateMessage = sprintf("%s的回合！", [userList[_currentUser].id]);
     gameStep = GameStep.deploy;
+    uploadGame();
   }
 
   void loadMap1() {
@@ -451,7 +535,6 @@ class Checkerboard {
 
 
   void checkAllSurround(int size) {
-    List<Disturb> event = [];
     Map<int, bool> check = {};
     List<int> nums = [0, 0, 0, 0];
     for (Buildings building in builds) {
@@ -519,9 +602,9 @@ class Checkerboard {
             print(sprintf("玩家%d 分数 %d 颁奖第%d名，要求%d, ",[i, nums[i], j, maxseq[j]]));
             if (nums[i] + building.belongs[i] >= maxseq[j]) {
               if (j + 1 < maxseq.length && maxseq[j] == maxseq[j + 1]) {
-                give(i, j + 1, building.type, event);
+                give(i, j + 1, building.type, building.number);
               } else {
-                give(i, j, building.type, event);
+                give(i, j, building.type, building.number);
               }
               break;
             }
@@ -531,10 +614,16 @@ class Checkerboard {
     }
   }
 
-  void give(int userOrder, int order, SQState s, List<Disturb> event) {
+  void give(int userOrder, int order, SQState s, int number) {
     var usr = chooseUser(userOrder);
     if (s == SQState.town) {
       if (order == 0) {
+        if (userOrder == currentUser().turnOrder) {
+          taskStack.add(Step(StepState.expand, CardFactory.getInstance().getBaseCard(0),
+              dis: Disturb(0, usr.turnOrder, number)));
+        } else {
+          event.add(Disturb(0, usr.turnOrder, number));
+        }
         usr.gainProsperity(2);
       } else if (order == 1) {
         usr.gainProsperity(1);
@@ -544,6 +633,12 @@ class Checkerboard {
 
     } else if (s == SQState.vil) {
       if (order == 0) {
+        if (userOrder == currentUser().turnOrder) {
+          taskStack.add(Step(StepState.expand, CardFactory.getInstance().getBaseCard(0),
+              dis: Disturb(1, usr.turnOrder, number)));
+        } else {
+          event.add(Disturb(1, usr.turnOrder, number));
+        }
         usr.gainProsperity(1);
       } else if (order == 1) {
         usr.gainGold(3);
@@ -568,6 +663,67 @@ class Checkerboard {
     return true;
   }
 
+  void emptyAndSet(Disturb? dis, List<Point> p, int size) {
+    Map<int, bool> check = {};
+    List<Point> points = [];
+    if (dis?.type == 0) {
+      Buildings? b = getCastle();
+      for (Point p in b?.points?? []) {
+        for (int i = -1; i < 2; i++)
+          for (int j = -1; j < 2; j++) {
+            if ((p.dx + i >= 0) && (p.dx + i < size) && (p.dy + j >= 0) && (p.dy + j < size)) {
+              if (!(state[p.dx + i][p.dy + j] == SQState.town ||
+                  state[p.dx + i][p.dy + j] == SQState.mine ||
+                  state[p.dx + i][p.dy + j] == SQState.vil)) {
+                if (check[(p.dx + i) * 16 + (p.dy + j)] != true) {
+                  check[(p.dx + i) * 16 + (p.dy + j)] = true;
+                  points.add(Point(p.dx + i, p.dy + j, SQState.empty));
+                }
+              }
+            }
+          }
+      }
+      updata(points);
+    } else if (dis?.type == 1) {
+      Buildings? b = getVil(dis?.number?? 0);
+      for (Point p in b?.points?? []) {
+        for (int i = -1; i < 2; i++)
+          for (int j = -1; j < 2; j++) {
+            if ((p.dx + i >= 0) && (p.dx + i < size) && (p.dy + j >= 0) && (p.dy + j < size)) {
+              if (!(state[p.dx + i][p.dy + j] == SQState.town ||
+                  state[p.dx + i][p.dy + j] == SQState.mine ||
+                  state[p.dx + i][p.dy + j] == SQState.vil)) {
+                if (check[(p.dx + i) * 16 + (p.dy + j)] != true) {
+                  check[(p.dx + i) * 16 + (p.dy + j)] = true;
+                  points.add(Point(p.dx + i, p.dy + j, SQState.empty));
+                }
+              }
+            }
+          }
+      }
+      updata(points);
+    }
+    updata(p);
+  }
+
+  Buildings? getCastle() {
+    for (Buildings b in builds) {
+      if (b.type == SQState.town) {
+        return b;
+      }
+    }
+    return null;
+  }
+
+  Buildings? getVil(int number) {
+    for (Buildings b in builds) {
+      if (b.type == SQState.vil && b.number == number) {
+        return b;
+      }
+    }
+    return null;
+  }
+
   bool checkMineSurroundBySomeone(Buildings building, int size, SQState s) {
     for (Point p in building.points) {
       for (int i = -1; i < 2; i++)
@@ -577,7 +733,6 @@ class Checkerboard {
                 state[p.dx + i][p.dy + j] == SQState.town ||
                 state[p.dx + i][p.dy + j] == SQState.mine ||
                 state[p.dx + i][p.dy + j] == SQState.vil)) {
-              return false;
             }
           }
         }
@@ -618,6 +773,9 @@ class Checkerboard {
     if (s.state == StepState.end_deploy) {
       taskStack.removeLast();
       checkAllSurround(16);
+
+      play.add(s.baseCard.cardId);
+      currentUser().hands.remove(s.baseCard.cardId);
       nextStep();
     }
   }

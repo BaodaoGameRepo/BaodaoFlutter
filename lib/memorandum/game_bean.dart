@@ -83,7 +83,7 @@ class Disturb extends Object {
   int type;
 
   @JsonKey(name: 'usr')
-  String usr;
+  int usr;
 
   @JsonKey(name: 'number')
   int number;

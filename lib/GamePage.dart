@@ -15,6 +15,7 @@ import 'package:gobang/utils/TipsDialog.dart';
 import 'package:gobang/viewModel/GameViewModel.dart';
 import 'package:sprintf/sprintf.dart';
 
+import 'api/core/update_client.dart';
 import 'bridge/CircleShape.dart';
 import 'card/base_card.dart';
 import 'common_widget/buy_bottom_sheet.dart';
@@ -23,6 +24,8 @@ import 'common_widget/mj_text_shadow_container.dart';
 import 'factory/BlackThemeFactory.dart';
 import 'factory/BlueThemeFactory.dart';
 import 'flyweight/Position.dart';
+import 'memorandum/game_bean.dart';
+import 'memorandum/get_game_request.dart';
 
 var width = 0.0;
 
@@ -50,8 +53,16 @@ class GamePageState extends State<GamePage> {
     currentLight = lightOn;
     _themeFactory = BlueThemeFactory();
     currentShape = circle;
-
+    _originator.context = context;
+    initReq();
     super.initState();
+  }
+
+  void initReq() async {
+    await _originator.initReq();
+    setState(() {
+
+    });
   }
 
   @override
@@ -140,6 +151,33 @@ class GamePageState extends State<GamePage> {
                             });
                         return;
                       }
+                      if (task.state == ck.StepState.expand) {
+                        ck.SQState s = ck.SQState.empty;
+                        if (task.dis?.type == 0) {
+                          s = ck.SQState.town;
+                        } else if (task.dis?.type == 1) {
+                          s = ck.SQState.vil;
+                        }
+                        List<ck.Point> points = checkList.map((e) {
+                          int x = e ~/ 16;
+                          int y = e % 16;
+                          return ck.Point(x, y, s);
+                        }).toList();
+                        if (points.length != 1) {
+                          setState(() {
+                            _originator.stateMessage = "你必须且只能扩张一片土地";
+                          });
+                        } else {
+                          if (_originator.checkIsYours(points)) {
+                            _originator.emptyAndSet(task.dis, points, 16);
+                            _originator.taskStack.removeLast();
+                            setState(() {
+                              _originator.nextStep();
+                            });
+                            _originator.uploadGame();
+                          }
+                        }
+                      }
                       if (task.state == ck.StepState.deploy) {
                         int minX = 200,
                             minY = 200,
@@ -161,8 +199,6 @@ class GamePageState extends State<GamePage> {
                             setState(() {
                               var s = _originator.taskStack.removeLast();
                               _originator.updata(points);
-                              _originator.play.add(s.baseCard.cardId);
-                              _originator.currentUser().hands.remove(s.baseCard.cardId);
                               if (num > 0) {
                                 _originator.taskStack.add(ck.Step(ck.StepState.undeploy, s.baseCard, disCount: num * 2));
                               }

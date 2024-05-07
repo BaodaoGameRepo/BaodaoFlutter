@@ -8,6 +8,14 @@ class Assets {
   static const String characterJessica = 'images/png/character/Jessica.png';
   static const String characterMonika = 'images/png/character/Monika.png';
   static const String characterTom = 'images/png/character/Tom.png';
+  static const String pngBackgroundImages = 'images/png/background_images.png';
+  static const String pngBadKnight = 'images/png/bad_knight.jpg';
+  static const String pngBlackBussinessman = 'images/png/black_bussinessman.jpg';
+  static const String pngBtnLogin = 'images/png/btn_login.png';
+  static const String pngBtnLoginLight = 'images/png/btn_login_light.png';
+  static const String pngBussinessman = 'images/png/bussinessman.jpg';
+  static const String pngCardHolyknight = 'images/png/card_holyknight.jpg';
+  static const String pngContinueButtons = 'images/png/continue_buttons.png';
   static const String pngGetStartBg = 'images/png/get_start_bg.png';
   static const String pngIconAccountSettings = 'images/png/icon_account_settings.png';
   static const String pngIconApple = 'images/png/icon_apple.png';
@@ -29,9 +37,11 @@ class Assets {
   static const String pngIconTermsService = 'images/png/icon_terms_service.png';
   static const String pngIconUpload = 'images/png/icon_upload.png';
   static const String pngLabelLeft = 'images/png/label_left.png';
+  static const String pngLogoOnWhite = 'images/png/logo_on_white.png';
   static const String pngSoldier = 'images/png/soldier.jpg';
   static const String pngSpearmen = 'images/png/spearmen.jpg';
   static const String pngSwordsman = 'images/png/swordsman.jpg';
+  static const String pngTreasure = 'images/png/treasure.jpg';
   static const String pngWelcomeBg = 'images/png/welcome_bg.png';
   static const String pngWelcomeDefaultAvatar = 'images/png/welcome_default_avatar.png';
   static const String pngWelcomeTabView1 = 'images/png/welcome_tabView1.png';

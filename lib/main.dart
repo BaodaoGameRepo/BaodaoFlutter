@@ -12,7 +12,7 @@ import 'common_widget/custom_toast_widget.dart';
 void main() {
   CustomFlutterBinding();
   app.init();
-  runApp(MyApp(FlutterRouterCons.appEntry));
+  runApp(MyApp(FlutterRouterCons.welcome));
 }
 
 class CustomFlutterBinding extends WidgetsFlutterBinding {}
